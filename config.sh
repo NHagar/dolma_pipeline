@@ -15,7 +15,7 @@ FILTERED_URL_DIR="${PIPELINE_BASE_DIR}/filtered_url_batches"
 
 # Scratch directory for temporary batch processing
 # Ensure this is on your HPC's scratch filesystem
-SCRATCH_BASE_DIR="scratch/nrh146/dolma_processing" # ${SCRATCH} is often a system env var
+SCRATCH_BASE_DIR="/scratch/nrh146/dolma_processing" # ${SCRATCH} is often a system env var
 
 # Number of parallel downloads for wget
 PARALLEL_DOWNLOADS=4 # Adjust based on network and node politeness
