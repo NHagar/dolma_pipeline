@@ -73,10 +73,10 @@ def main():
 
     con.execute("SET enable_progress_bar=false;")  # Disable for non-interactive script
     con.execute(
-        "SET memory_limit='32GB';"
+        "SET memory_limit='64GB';"
     )  # Example: Set memory limit for DuckDB, adjust based on Slurm request
     con.execute(
-        "PRAGMA threads=8;"
+        "PRAGMA threads=16;"
     )  # Example: Set threads, adjust based on Slurm CPU request
 
     # Register the UDF
