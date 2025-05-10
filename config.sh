@@ -21,7 +21,7 @@ SCRATCH_BASE_DIR="scratch/nrh146/dolma_processing" # ${SCRATCH} is often a syste
 PARALLEL_DOWNLOADS=4 # Adjust based on network and node politeness
 
 # Number of URLs per batch
-URLS_PER_BATCH=400
+URLS_PER_BATCH=100
 
 # Dolma versions to process
 DOLMA_VERSIONS=("v1.5" "v1.6" "v1.7") # Use "v1_5", "v1_6", "v1_7" if file names are like that
