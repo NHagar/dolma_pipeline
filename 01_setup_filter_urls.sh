@@ -19,7 +19,7 @@ echo "Checking/Creating Hugging Face repositories..."
 for DOLMA_VER in "${DOLMA_VERSIONS[@]}"; do
     TARGET_REPO_ID="${HF_USERNAME}/dolma_urls_${DOLMA_VER}"
     echo "Ensuring repo ${TARGET_REPO_ID} exists..."
-    uv run -c "from huggingface_hub import create_repo, HfFolder; HfFolder.save_token('$HUGGING_FACE_HUB_TOKEN'); create_repo('${TARGET_REPO_ID}', repo_type='dataset', exist_ok=True)"
+    uv run python -c "from huggingface_hub import create_repo, HfFolder; HfFolder.save_token('$HUGGING_FACE_HUB_TOKEN'); create_repo('${TARGET_REPO_ID}', repo_type='dataset', exist_ok=True)"
 done
 
 # 3. Filter URLs and create batch files
