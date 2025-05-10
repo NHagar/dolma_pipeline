@@ -4,6 +4,7 @@ import os
 
 import duckdb
 import tldextract
+from duckdb.typing import VARCHAR
 from huggingface_hub import HfApi
 
 # Configure logging
@@ -83,8 +84,8 @@ def main():
     con.create_function(
         "extract_domain",
         extract_domain,
-        [duckdb.VARCHAR],
-        duckdb.VARCHAR,
+        [VARCHAR],
+        VARCHAR,
         null_handling="special",  # Important for UDFs that can receive NULLs
     )
 
