@@ -5,14 +5,6 @@ source "$(dirname "$0")/config.sh" # This will also load BATCH_MANIFEST_FILE pat
 
 echo "--- Starting Slurm Job Array Submission for Dolma Processing ---"
 
-# Ensure Python venv exists and packages are installed
-if [ ! -f "${PYTHON_VENV_ACTIVATE}" ]; then
-    echo "Python virtual environment not found at ${PYTHON_VENV_ACTIVATE}"
-    echo "Please create it: python3 -m venv $(dirname ${PYTHON_VENV_ACTIVATE})/venv"
-    echo "Then activate and install: source ${PYTHON_VENV_ACTIVATE} && pip install duckdb tldextract huggingface_hub pandas pyarrow"
-    exit 1
-fi
-
 echo "Creating batch manifest file at ${BATCH_MANIFEST_FILE}..."
 # Clear previous manifest if it exists
 > "${BATCH_MANIFEST_FILE}"

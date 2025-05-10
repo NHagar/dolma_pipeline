@@ -124,7 +124,7 @@ df -h "${SCRATCH_BASE_DIR}"
 echo "Processing batch ${BATCH_NUM_STR} (Task ${SLURM_ARRAY_TASK_ID}) with DuckDB..."
 # Note: PIPELINE_BASE_DIR_FOR_CONFIG is the directory of this sbatch script.
 # process_batch_duckdb.py is assumed to be in the same directory.
-uv run "${PIPELINE_BASE_DIR_FOR_CONFIG}/process_batch_duckdb.py" \
+uv run python "${PIPELINE_BASE_DIR_FOR_CONFIG}/process_batch_duckdb.py" \
     --batch_data_dir "${RAW_DATA_DIR}" \
     --output_dir "${PROCESSED_DATA_DIR}" \
     --batch_num_str "${BATCH_NUM_STR}" \
