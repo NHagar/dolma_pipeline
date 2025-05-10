@@ -84,6 +84,7 @@ sbatch \
     --array="${JOB_ARRAY_SPEC}" \
     --output="${SLURM_LOG_DIR_ARRAY}/dolma_job_%A_task_%a.out" \
     --error="${SLURM_LOG_DIR_ARRAY}/dolma_job_%A_task_%a.err" \
+    --export=ALL,PIPELINE_BASE_DIR="${PIPELINE_BASE_DIR}" \
     "${PIPELINE_BASE_DIR}/03_process_batch.sh" \
     "${BATCH_MANIFEST_FILE}" # Pass the manifest file path
 

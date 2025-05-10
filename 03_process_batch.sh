@@ -17,14 +17,28 @@ MANIFEST_FILE_ARG="$1"
 # Determine PIPELINE_BASE_DIR to source config.sh
 # This assumes 03_process_batch.sbatch is in PIPELINE_BASE_DIR.
 # If sbatch copies the script, this might need adjustment or PIPELINE_BASE_DIR passed as env.
-CURRENT_SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &> /dev/null && pwd)
-PIPELINE_BASE_DIR_FOR_CONFIG="${CURRENT_SCRIPT_DIR}" # Or a more robust way if needed
+if [ -z "$PIPELINE_BASE_DIR" ]; then
+    echo "FATAL: PIPELINE_BASE_DIR environment variable is not set."
+    echo "This script expects PIPELINE_BASE_DIR to be exported by the Slurm submission script."
+    # As a secondary fallback, one might try SLURM_SUBMIT_DIR, but the export is preferred.
+    if [ -n "$SLURM_SUBMIT_DIR" ]; then
+        echo "INFO: Attempting to use SLURM_SUBMIT_DIR (${SLURM_SUBMIT_DIR}) as PIPELINE_BASE_DIR."
+        PIPELINE_BASE_DIR="$SLURM_SUBMIT_DIR"
+    else
+        exit 1
+    fi
+fi
 
-if [ ! -f "${PIPELINE_BASE_DIR_FOR_CONFIG}/config.sh" ]; then
-    echo "FATAL: config.sh not found in ${PIPELINE_BASE_DIR_FOR_CONFIG}. Cannot proceed."
+CONFIG_FILE_PATH="${PIPELINE_BASE_DIR}/config.sh"
+
+if [ ! -f "${CONFIG_FILE_PATH}" ]; then
+    echo "FATAL: config.sh not found at expected path: ${CONFIG_FILE_PATH}"
+    echo "PIPELINE_BASE_DIR was resolved to: ${PIPELINE_BASE_DIR}"
     exit 1
 fi
-source "${PIPELINE_BASE_DIR_FOR_CONFIG}/config.sh" # This loads BATCH_MANIFEST_FILE, SCRATCH_BASE_DIR etc.
+# Source config.sh using the now correctly identified PIPELINE_BASE_DIR
+# This will load BATCH_MANIFEST_FILE, SCRATCH_BASE_DIR, PYTHON_VENV_ACTIVATE etc.
+source "${CONFIG_FILE_PATH}"
 
 # Validate that the manifest file passed as argument is the one from config (optional check)
 if [ "${MANIFEST_FILE_ARG}" != "${BATCH_MANIFEST_FILE}" ]; then
