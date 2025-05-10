@@ -112,7 +112,7 @@ if [ ! -s "${BATCH_URL_FILE}" ]; then
     exit 1 # The trap will clean up
 fi
 
-cat "${BATCH_URL_FILE}" | xargs -n 1 -P "${PARALLEL_DOWNLOADS}" wget -c --timeout=60 --tries=5 -q -P "${RAW_DATA_DIR}"
+cat "${BATCH_URL_FILE}" | xargs -n 1 -P "${PARALLEL_DOWNLOADS}" wget -c --timeout=60 --tries=10 -q -P "${RAW_DATA_DIR}"
 WGET_EXIT_CODE=$?
 if [ ${WGET_EXIT_CODE} -ne 0 ]; then
     # xargs exit codes: 123 if any invocation fails, 124 if command not found, 125 if options issue.
