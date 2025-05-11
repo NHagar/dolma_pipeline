@@ -100,6 +100,7 @@ for dataset in DATASETS:
                 domains = [extract_domain(url) for url in extracted_urls]
 
                 df = pd.DataFrame({"url": extracted_urls, "domain": domains})
+                df = df.dropna()
 
                 con.execute("INSERT INTO urls SELECT * FROM df")
 
