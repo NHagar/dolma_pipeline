@@ -5,7 +5,6 @@ from pathlib import Path
 
 import duckdb
 import tldextract
-from duckdb.typing import VARCHAR
 from huggingface_hub import HfApi
 from tqdm import tqdm
 
@@ -79,51 +78,36 @@ for dataset in DATASETS:
                 print(f"Failed to download batch: {e}")
                 if os.path.exists(temp_file_path):
                     os.unlink(temp_file_path)
-                continue
+                raise
 
-            # Process the downloaded files with DuckDB
             db_file = intermediate_path / f"{pattern_local}.duckdb"
             con = duckdb.connect(database=db_file, read_only=False)
-            con.execute("SET enable_progress_bar=true;")
             con.execute(
                 "CREATE TABLE IF NOT EXISTS urls (url VARCHAR, domain VARCHAR);"
             )
-            # Register the UDF
-            try:
-                con.create_function(
-                    "extract_domain",
-                    extract_domain,
-                    [VARCHAR],
-                    VARCHAR,
-                    null_handling="special",
+
+            files = Path(downloads_path).glob("*.json.gz")
+            for file in tqdm(files):
+                command = f"zcat {file} | jq -r '.{variant.selection_sql}'"
+                result = subprocess.run(
+                    command, shell=True, capture_output=True, text=True
                 )
-            except duckdb.duckdb.CatalogException as e:
-                if "already exists" not in str(e):
-                    raise  # Re-raise if it's not the "already exists" error
-                # Function already exists, so we can continue
+                if result.returncode != 0:
+                    print(f"Failed to process file {file}: {result.stderr}")
+                    raise
+                extracted_urls = result.stdout.splitlines()
+                domains = [extract_domain(url) for url in extracted_urls]
 
-            url_sql = f"""WITH urls AS (
-            {variant.selection_sql} AS url FROM READ_JSON('{str(downloads_path)}/*')
-            )
-            SELECT
-                url,
-                extract_domain(url) AS domain
-            FROM urls
-            WHERE url IS NOT NULL AND url != ''
-            """
+                con.execute(
+                    "INSERT INTO urls (url, domain) VALUES (?, ?)",
+                    [(url, domain) for url, domain in zip(extracted_urls, domains)],
+                )
 
-            print(f"Executing SQL: {url_sql}")
-
-            # Process the file and extract the domain
-            con.execute(f"""INSERT INTO urls
-            {url_sql}
-            """)
-
-            # add URL to completed list
-            with open(f"completed/{pattern_local}", "a") as f:
-                for url in url_batch:
-                    f.write(f"{url}\n")
-            print(f"Added {len(url_batch)} URLs to completed list.")
+                # add URL to completed list
+                with open(f"completed/{pattern_local}", "a") as f:
+                    for url in url_batch:
+                        f.write(f"{url}\n")
+                print(f"Added {len(url_batch)} URLs to completed list.")
 
             # Remove the downloaded files
             for url in url_batch:
@@ -135,42 +119,39 @@ for dataset in DATASETS:
                     print(f"File {file_path} does not exist.")
             print(f"Removed downloaded files for {pattern_local}.")
 
-            # check how many rows in table
-            batch_count = con.execute("SELECT COUNT(*) FROM urls").fetchone()[0]
-            if batch_count >= 50_000_000:
-                # Write to Parquet
-                parquet_file = intermediate_path / f"{pattern_local}.parquet"
-                con.execute(
-                    f"COPY (SELECT * FROM urls) TO '{str(parquet_file)}' (FORMAT PARQUET, CODEC 'ZSTD');"
-                )
-                print(f"Written {batch_count} rows to {parquet_file}.")
+            # Write to Parquet
+            parquet_file = intermediate_path / f"{pattern_local}.parquet"
+            con.execute(
+                f"COPY (SELECT * FROM urls) TO '{str(parquet_file)}' (FORMAT PARQUET, CODEC 'ZSTD');"
+            )
+            print(f"Created {parquet_file}.")
 
-                # Upload to Hugging Face
-                api = HfApi()
-                repo_id_to_upload = pattern_hf
-                # unique batch number for repo
-                batch_num_str = url.split("/")[-1].split(".")[0]
-                path_in_repo = f"batch_{batch_num_str}.parquet"
-                api.create_repo(
-                    repo_id=repo_id_to_upload,
-                    exist_ok=True,
-                    repo_type="dataset",
-                )
-                print(
-                    f"Uploading {parquet_file} to {repo_id_to_upload} as {path_in_repo}..."
-                )
+            # Upload to Hugging Face
+            api = HfApi()
+            repo_id_to_upload = pattern_hf
+            # unique batch number for repo
+            batch_num_str = url.split("/")[-1].split(".")[0]
+            path_in_repo = f"batch_{batch_num_str}.parquet"
+            api.create_repo(
+                repo_id=repo_id_to_upload,
+                exist_ok=True,
+                repo_type="dataset",
+            )
+            print(
+                f"Uploading {parquet_file} to {repo_id_to_upload} as {path_in_repo}..."
+            )
 
-                api.upload_file(
-                    path_or_fileobj=parquet_file,
-                    path_in_repo=path_in_repo,
-                    repo_id=repo_id_to_upload,
-                    repo_type="dataset",
-                    commit_message=f"Add batch {batch_num_str} of {pattern_local}",
-                    revision="main",
-                )
-                # Remove the intermediate files
-                con.execute("DROP TABLE urls;")
-                con.close()
-                Path(db_file).unlink(missing_ok=True)
-                Path(parquet_file).unlink(missing_ok=True)
-                print(f"Removed intermediate files for {pattern_local}.")
+            api.upload_file(
+                path_or_fileobj=parquet_file,
+                path_in_repo=path_in_repo,
+                repo_id=repo_id_to_upload,
+                repo_type="dataset",
+                commit_message=f"Add batch {batch_num_str} of {pattern_local}",
+                revision="main",
+            )
+            # Remove the intermediate files
+            con.execute("DROP TABLE urls;")
+            con.close()
+            Path(db_file).unlink(missing_ok=True)
+            Path(parquet_file).unlink(missing_ok=True)
+            print(f"Removed intermediate files for {pattern_local}.")
