@@ -95,7 +95,7 @@ for dataset in DATASETS:
                 )
                 if result.returncode != 0:
                     print(f"Failed to process file {file}: {result.stderr}")
-                    raise
+                    raise Exception(f"Failed to process file {file}: {result.stderr}")
                 extracted_urls = result.stdout.splitlines()
                 domains = [extract_domain(url) for url in extracted_urls]
 
