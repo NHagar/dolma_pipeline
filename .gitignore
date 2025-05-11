@@ -10,3 +10,8 @@ wheels/
 .venv
 
 urls/
+completed/
+downloads/
+intermediate/
+
+.DS_Store

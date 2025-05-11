@@ -7,6 +7,9 @@ from datasets import DATASETS
 urls_path = Path("urls")
 urls_path.mkdir(parents=True, exist_ok=True)
 
+completed_path = Path("completed")
+completed_path.mkdir(parents=True, exist_ok=True)
+
 for dataset in DATASETS:
     for variant in dataset.variants:
         url_list_path = urls_path / f"{dataset.name}_{variant.name}.txt"
@@ -30,3 +33,7 @@ for dataset in DATASETS:
             for url in url_list_filtered:
                 f.write(f"{url}\n")
         print(f"Created {url_list_path} with {len(url_list_filtered)} lines")
+
+        with open(completed_path / f"{dataset.name}_{variant.name}.txt", "w") as f:
+            continue
+        print(f"Created {completed_path / f'{dataset.name}_{variant.name}.txt'}")

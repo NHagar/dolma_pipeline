@@ -106,6 +106,7 @@ dependencies = [
     { name = "pydantic" },
     { name = "requests" },
     { name = "tldextract" },
+    { name = "tqdm" },
 ]
 
 [package.metadata]
@@ -117,6 +118,7 @@ requires-dist = [
     { name = "pydantic", specifier = ">=2.11.4" },
     { name = "requests", specifier = ">=2.32.3" },
     { name = "tldextract", specifier = ">=5.3.0" },
+    { name = "tqdm", specifier = ">=4.67.1" },
 ]
 
 [[package]]
