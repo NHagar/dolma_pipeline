@@ -1,4 +1,6 @@
+import os
 import subprocess
+import tempfile
 from pathlib import Path
 
 import duckdb
@@ -26,6 +28,12 @@ def extract_domain(url: str) -> str:
         return None  # Handle potential errors in tldextract
 
 
+def batch_urls(url_list, batch_size=100):
+    """Split the URL list into batches of specified size."""
+    for i in range(0, len(url_list), batch_size):
+        yield url_list[i : i + batch_size]
+
+
 for dataset in DATASETS:
     for variant in dataset.variants:
         pattern_local = f"{dataset.name}_{variant.name}.txt"
@@ -47,8 +55,18 @@ for dataset in DATASETS:
             print(f"No new URLs to process for {pattern_local}.")
             continue
 
-        for url in tqdm(url_list, desc=f"Processing {pattern_local}"):
-            # Download the file
+        # Process URLs in batches of 100
+        for url_batch in tqdm(
+            list(batch_urls(url_list, 100)),
+            desc=f"Processing batches for {pattern_local}",
+        ):
+            # Create a temporary file for the batch of URLs
+            with tempfile.NamedTemporaryFile(mode="w", delete=False) as temp_file:
+                for url in url_batch:
+                    temp_file.write(f"{url}\n")
+                temp_file_path = temp_file.name
+
+            # Download the files in batch using aria2c
             try:
                 subprocess.run(
                     [
@@ -58,21 +76,24 @@ for dataset in DATASETS:
                         "-s",
                         "16",
                         "-c",
-                        url,
                         "-d",
                         str(downloads_path),
-                        "-o",
-                        f"{url.split('/')[-1]}",
+                        "-i",
+                        temp_file_path,
+                        "--show-console-readout=true",
+                        "--summary-interval=5",
+                        "--download-result=full",
                     ],
                     check=True,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
                 )
+                # Remove the temporary file after use
+                os.unlink(temp_file_path)
             except subprocess.CalledProcessError as e:
-                print(f"Failed to download {url}: {e}")
+                print(f"Failed to download batch: {e}")
+                os.unlink(temp_file_path)
                 continue
 
-            # Process the downloaded file with DuckDB
+            # Process the downloaded files with DuckDB
             db_file = intermediate_path / f"{pattern_local}.duckdb"
             con = duckdb.connect(database=db_file, read_only=False)
             con.execute("SET enable_progress_bar=true;")
@@ -94,7 +115,7 @@ for dataset in DATASETS:
                 # Function already exists, so we can continue
 
             url_sql = f"""WITH urls AS (
-            {variant.selection_sql} AS url FROM '{str(downloads_path)}/{url.split('/')[-1]}'
+            {variant.selection_sql} AS url FROM '{str(downloads_path)}/*'
             )
             SELECT
                 url,
@@ -111,11 +132,19 @@ for dataset in DATASETS:
 
                 # add URL to completed list
                 with open(f"completed/{pattern_local}", "a") as f:
-                    f.write(f"{url}\n")
-                print(f"Processed {url} and added to completed list.")
+                    for url in url_batch:
+                        f.write(f"{url}\n")
+                print(f"Added {len(url_batch)} URLs to completed list.")
 
-                # Remove the downloaded file
-                (downloads_path / f"{url.split('/')[-1]}").unlink(missing_ok=True)
+                # Remove the downloaded files
+                for url in url_batch:
+                    url = url.split("/")[-1]
+                    file_path = downloads_path / url
+                    if file_path.exists():
+                        file_path.unlink(missing_ok=True)
+                    else:
+                        print(f"File {file_path} does not exist.")
+                print(f"Removed downloaded files for {pattern_local}.")
 
             except Exception as e:
                 print(f"Failed to process {url}: {e}")
