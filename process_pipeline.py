@@ -60,30 +60,27 @@ for dataset in DATASETS:
             list(batch_urls(url_list, 100)),
             desc=f"Processing batches for {pattern_local}",
         ):
-            # Create a temporary file for the batch of URLs
-            with tempfile.NamedTemporaryFile(mode="w", delete=False) as temp_file:
-                for url in url_batch:
-                    temp_file.write(f"{url}\n")
-                temp_file_path = temp_file.name
-
-            # Download the files in batch using aria2c
+            # Download the files in batch using wget in parallel mode
             try:
+                # Create a temporary file for the batch of URLs
+                with tempfile.NamedTemporaryFile(mode="w", delete=False) as temp_file:
+                    for url in url_batch:
+                        temp_file.write(f"{url}\n")
+                    temp_file_path = temp_file.name
+
+                # Use wget with parallel downloads
                 subprocess.run(
                     [
-                        "aria2c",
-                        "-x",
-                        "8",
-                        "-s",
-                        "1",
-                        "-c",
-                        "-d",
-                        str(downloads_path),
-                        "-i",
-                        temp_file_path,
-                        "--show-console-readout=true",
-                        "--summary-interval=5",
-                        "--download-result=full",
-                        "--enable-http-pipelining=true",
+                        "wget",
+                        "--directory-prefix=" + str(downloads_path),
+                        "--continue",  # Resume partially downloaded files
+                        "--no-clobber",  # Do not overwrite existing files
+                        "--input-file=" + temp_file_path,
+                        "--progress=bar",
+                        "--tries=3",
+                        "--wait=1",
+                        "--random-wait",  # Add some randomization to avoid being blocked
+                        "--no-check-certificate",  # Skip certificate validation
                     ],
                     check=True,
                 )
@@ -91,7 +88,8 @@ for dataset in DATASETS:
                 os.unlink(temp_file_path)
             except subprocess.CalledProcessError as e:
                 print(f"Failed to download batch: {e}")
-                os.unlink(temp_file_path)
+                if os.path.exists(temp_file_path):
+                    os.unlink(temp_file_path)
                 continue
 
             # Process the downloaded files with DuckDB
