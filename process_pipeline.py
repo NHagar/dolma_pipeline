@@ -72,9 +72,9 @@ for dataset in DATASETS:
                     [
                         "aria2c",
                         "-x",
-                        "16",
+                        "8",
                         "-s",
-                        "16",
+                        "8",
                         "-c",
                         "-d",
                         str(downloads_path),
@@ -83,6 +83,7 @@ for dataset in DATASETS:
                         "--show-console-readout=true",
                         "--summary-interval=5",
                         "--download-result=full",
+                        "--enable-http-pipelining=true",
                     ],
                     check=True,
                 )
