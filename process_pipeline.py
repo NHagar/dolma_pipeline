@@ -61,7 +61,7 @@ for dataset in DATASETS:
             desc=f"Processing batches for {pattern_local}",
         ):
             print(f"Batch urls: {url_batch}")
-            # Download the files in batch using wget in parallel mode
+            # Download the files in batch using xargs for parallel processing
             try:
                 # Create a temporary file for the batch of URLs
                 with tempfile.NamedTemporaryFile(mode="w", delete=False) as temp_file:
@@ -69,23 +69,10 @@ for dataset in DATASETS:
                         temp_file.write(f"{url}\n")
                     temp_file_path = temp_file.name
 
-                # Use wget with parallel downloads
-                subprocess.run(
-                    [
-                        "wget",
-                        "--directory-prefix=" + str(downloads_path),
-                        "--continue",  # Resume partially downloaded files
-                        "--no-clobber",  # Do not overwrite existing files
-                        "--input-file=" + temp_file_path,
-                        "--progress=bar",
-                        "--parallel=10",  # Download up to 10 files in parallel
-                        "--tries=3",
-                        "--wait=1",
-                        "--random-wait",  # Add some randomization to avoid being blocked
-                        "--no-check-certificate",  # Skip certificate validation
-                    ],
-                    check=True,
-                )
+                # Use xargs to run wget in parallel (10 parallel processes)
+                cmd = f"cat {temp_file_path} | xargs -P 10 -I {{}} wget --directory-prefix={str(downloads_path)} --continue --no-clobber --progress=bar --tries=3 --no-check-certificate {{}}"
+                subprocess.run(cmd, shell=True, check=True)
+
                 # Remove the temporary file after use
                 os.unlink(temp_file_path)
             except subprocess.CalledProcessError as e:
