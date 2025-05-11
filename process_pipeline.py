@@ -9,9 +9,9 @@ from tqdm import tqdm
 
 from datasets import DATASETS
 
-intermediate_path = Path("intermediate")
+intermediate_path = Path("/mnt/nvme/intermediate")
 intermediate_path.mkdir(parents=True, exist_ok=True)
-downloads_path = Path("downloads")
+downloads_path = Path("/mnt/nvme/downloads")
 downloads_path.mkdir(parents=True, exist_ok=True)
 
 
@@ -60,7 +60,7 @@ for dataset in DATASETS:
                         "-c",
                         url,
                         "-d",
-                        "downloads",
+                        str(downloads_path),
                         "-o",
                         f"{url.split('/')[-1]}",
                     ],
@@ -73,7 +73,7 @@ for dataset in DATASETS:
                 continue
 
             # Process the downloaded file with DuckDB
-            db_file = f"intermediate/{pattern_local}.duckdb"
+            db_file = intermediate_path / f"{pattern_local}.duckdb"
             con = duckdb.connect(database=db_file, read_only=False)
             con.execute("SET enable_progress_bar=true;")
             con.execute(
@@ -94,7 +94,7 @@ for dataset in DATASETS:
                 # Function already exists, so we can continue
 
             url_sql = f"""WITH urls AS (
-            {variant.selection_sql} AS url FROM 'downloads/{url.split('/')[-1]}'
+            {variant.selection_sql} AS url FROM '{str(downloads_path)}/{url.split('/')[-1]}'
             )
             SELECT
                 url,
@@ -115,7 +115,7 @@ for dataset in DATASETS:
                 print(f"Processed {url} and added to completed list.")
 
                 # Remove the downloaded file
-                Path(f"downloads/{url.split('/')[-1]}").unlink(missing_ok=True)
+                (downloads_path / f"{url.split('/')[-1]}").unlink(missing_ok=True)
 
             except Exception as e:
                 print(f"Failed to process {url}: {e}")
@@ -126,9 +126,9 @@ for dataset in DATASETS:
             batch_count = con.execute("SELECT COUNT(*) FROM urls").fetchone()[0]
             if batch_count >= 50_000_000:
                 # Write to Parquet
-                parquet_file = f"intermediate/{pattern_local}.parquet"
+                parquet_file = intermediate_path / f"{pattern_local}.parquet"
                 con.execute(
-                    f"COPY (SELECT * FROM urls) TO '{parquet_file}' (FORMAT PARQUET, CODEC 'ZSTD');"
+                    f"COPY (SELECT * FROM urls) TO '{str(parquet_file)}' (FORMAT PARQUET, CODEC 'ZSTD');"
                 )
                 print(f"Written {batch_count} rows to {parquet_file}.")
 
