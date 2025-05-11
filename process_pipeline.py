@@ -4,6 +4,7 @@ import tempfile
 from pathlib import Path
 
 import duckdb
+import pandas as pd
 import tldextract
 from huggingface_hub import HfApi
 from tqdm import tqdm
@@ -98,10 +99,9 @@ for dataset in DATASETS:
                 extracted_urls = result.stdout.splitlines()
                 domains = [extract_domain(url) for url in extracted_urls]
 
-                con.execute(
-                    "INSERT INTO urls (url, domain) VALUES (?, ?)",
-                    [(url, domain) for url, domain in zip(extracted_urls, domains)],
-                )
+                df = pd.DataFrame({"url": extracted_urls, "domain": domains})
+
+                con.execute("INSERT INTO urls SELECT * FROM df")
 
             # add URL to completed list
             with open(f"completed/{pattern_local}", "a") as f:
