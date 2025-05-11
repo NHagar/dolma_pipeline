@@ -74,7 +74,7 @@ for dataset in DATASETS:
                         "-x",
                         "8",
                         "-s",
-                        "8",
+                        "1",
                         "-c",
                         "-d",
                         str(downloads_path),
