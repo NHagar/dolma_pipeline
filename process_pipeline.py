@@ -103,7 +103,7 @@ for dataset in DATASETS:
                 # Function already exists, so we can continue
 
             url_sql = f"""WITH urls AS (
-            {variant.selection_sql} AS url FROM '{str(downloads_path)}/*'
+            {variant.selection_sql} AS url FROM READ_JSON('{str(downloads_path)}/*')
             )
             SELECT
                 url,
@@ -113,31 +113,25 @@ for dataset in DATASETS:
             """
 
             # Process the file and extract the domain
-            try:
-                con.execute(f"""INSERT INTO urls
-                {url_sql}
-                """)
+            con.execute(f"""INSERT INTO urls
+            {url_sql}
+            """)
 
-                # add URL to completed list
-                with open(f"completed/{pattern_local}", "a") as f:
-                    for url in url_batch:
-                        f.write(f"{url}\n")
-                print(f"Added {len(url_batch)} URLs to completed list.")
-
-                # Remove the downloaded files
+            # add URL to completed list
+            with open(f"completed/{pattern_local}", "a") as f:
                 for url in url_batch:
-                    url = url.split("/")[-1]
-                    file_path = downloads_path / url
-                    if file_path.exists():
-                        file_path.unlink(missing_ok=True)
-                    else:
-                        print(f"File {file_path} does not exist.")
-                print(f"Removed downloaded files for {pattern_local}.")
+                    f.write(f"{url}\n")
+            print(f"Added {len(url_batch)} URLs to completed list.")
 
-            except Exception as e:
-                print(f"Failed to process {url}: {e}")
-                con.close()
-                continue
+            # Remove the downloaded files
+            for url in url_batch:
+                url = url.split("/")[-1]
+                file_path = downloads_path / url
+                if file_path.exists():
+                    file_path.unlink(missing_ok=True)
+                else:
+                    print(f"File {file_path} does not exist.")
+            print(f"Removed downloaded files for {pattern_local}.")
 
             # check how many rows in table
             batch_count = con.execute("SELECT COUNT(*) FROM urls").fetchone()[0]
