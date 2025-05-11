@@ -101,6 +101,7 @@ for dataset in DATASETS:
 
                 df = pd.DataFrame({"url": extracted_urls, "domain": domains})
                 df = df.dropna()
+                print(df.head())
 
                 con.execute("INSERT INTO urls SELECT * FROM df")
 
