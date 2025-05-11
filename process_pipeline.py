@@ -78,6 +78,7 @@ for dataset in DATASETS:
                         "--no-clobber",  # Do not overwrite existing files
                         "--input-file=" + temp_file_path,
                         "--progress=bar",
+                        "--parallel=10",  # Download up to 10 files in parallel
                         "--tries=3",
                         "--wait=1",
                         "--random-wait",  # Add some randomization to avoid being blocked
