@@ -60,6 +60,7 @@ for dataset in DATASETS:
             list(batch_urls(url_list, 100)),
             desc=f"Processing batches for {pattern_local}",
         ):
+            print(f"Batch urls: {url_batch}")
             # Download the files in batch using wget in parallel mode
             try:
                 # Create a temporary file for the batch of URLs
