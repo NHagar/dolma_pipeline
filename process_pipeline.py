@@ -103,11 +103,11 @@ for dataset in DATASETS:
                     [(url, domain) for url, domain in zip(extracted_urls, domains)],
                 )
 
-                # add URL to completed list
-                with open(f"completed/{pattern_local}", "a") as f:
-                    for url in url_batch:
-                        f.write(f"{url}\n")
-                print(f"Added {len(url_batch)} URLs to completed list.")
+            # add URL to completed list
+            with open(f"completed/{pattern_local}", "a") as f:
+                for url in url_batch:
+                    f.write(f"{url}\n")
+            print(f"Added {len(url_batch)} URLs to completed list.")
 
             # Remove the downloaded files
             for url in url_batch:
