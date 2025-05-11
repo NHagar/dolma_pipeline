@@ -112,6 +112,8 @@ for dataset in DATASETS:
             WHERE url IS NOT NULL AND url != ''
             """
 
+            print(f"Executing SQL: {url_sql}")
+
             # Process the file and extract the domain
             con.execute(f"""INSERT INTO urls
             {url_sql}
