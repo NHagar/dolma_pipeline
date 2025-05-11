@@ -9,5 +9,8 @@ dependencies = [
     "huggingface-hub>=0.31.1",
     "pandas>=2.2.3",
     "pyarrow>=20.0.0",
+    "pydantic>=2.11.4",
+    "requests>=2.32.3",
     "tldextract>=5.3.0",
+    "tqdm>=4.67.1",
 ]
