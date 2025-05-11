@@ -87,7 +87,7 @@ for dataset in DATASETS:
                 "CREATE TABLE IF NOT EXISTS urls (url VARCHAR, domain VARCHAR);"
             )
 
-            files = Path(downloads_path).glob("*.json.gz")
+            files = list(Path(downloads_path).glob("*.json.gz"))
             for file in tqdm(files):
                 command = f"zcat {file} | jq -r '.{variant.selection_sql}'"
                 result = subprocess.run(
