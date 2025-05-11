@@ -5,21 +5,21 @@ dolma = DatasetConfig(
     variants=[
         VariantConfig(
             name="v1.5",
-            url_list_url="https://huggingface.co/datasets/allenai/dolma/blob/main/urls/v1_5.txt",
+            url_list_url="https://huggingface.co/datasets/allenai/dolma/resolve/main/urls/v1_5.txt",
             selection_sql="SELECT metadata.url",
             inclusion_filters=["c4-", "cc_"],
             exclusion_filters=None,
         ),
         VariantConfig(
             name="v1.6",
-            url_list_url="https://huggingface.co/datasets/allenai/dolma/blob/main/urls/v1_6.txt",
+            url_list_url="https://huggingface.co/datasets/allenai/dolma/resolve/main/urls/v1_6.txt",
             selection_sql="SELECT metadata.url",
             inclusion_filters=["c4-", "cc_"],
             exclusion_filters=None,
         ),
         VariantConfig(
             name="v1.7",
-            url_list_url="https://huggingface.co/datasets/allenai/dolma/blob/main/urls/v1_7.txt",
+            url_list_url="https://huggingface.co/datasets/allenai/dolma/resolve/main/urls/v1_7.txt",
             selection_sql="SELECT metadata.url",
             inclusion_filters=["c4-", "cc_", "falcon-refinedweb"],
             exclusion_filters=None,
@@ -52,3 +52,10 @@ redpajama_v2 = DatasetConfig(
         )
     ],
 )
+
+
+DATASETS = [
+    dolma,
+    redpajama_1t,
+    redpajama_v2,
+]
