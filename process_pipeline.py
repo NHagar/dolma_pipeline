@@ -124,12 +124,6 @@ for dataset in DATASETS:
                 f"COPY (SELECT * FROM read_parquet('{str(downloads_path)}/*.parquet')) TO '{str(parquet_file)}';"
             )
 
-            # add URL to completed list
-            with open(f"completed/{pattern_local}", "a") as f:
-                for url in url_batch:
-                    f.write(f"{url}\n")
-            print(f"Added {len(url_batch)} URLs to completed list.")
-
             # Upload to Hugging Face
             api = HfApi()
             repo_id_to_upload = pattern_hf
@@ -153,6 +147,12 @@ for dataset in DATASETS:
                 commit_message=f"Add batch {batch_num_str} of {pattern_local}",
                 revision="main",
             )
+
+            # add URL to completed list
+            with open(f"completed/{pattern_local}", "a") as f:
+                for url in url_batch:
+                    f.write(f"{url}\n")
+            print(f"Added {len(url_batch)} URLs to completed list.")
 
             # Remove everything in the downloads folder
             for file in downloads_path.glob("*.json.gz"):
