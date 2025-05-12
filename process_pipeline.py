@@ -12,9 +12,9 @@ from tqdm import tqdm
 
 from datasets import DATASETS
 
-intermediate_path = Path("/mnt/nvme/intermediate")
+intermediate_path = Path("/scratch/nrh146/intermediate")
 intermediate_path.mkdir(parents=True, exist_ok=True)
-downloads_path = Path("/mnt/nvme/downloads")
+downloads_path = Path("/scratch/nrh146/downloads")
 downloads_path.mkdir(parents=True, exist_ok=True)
 
 
@@ -92,7 +92,7 @@ for dataset in DATASETS:
                     temp_file_path = temp_file.name
 
                 # Use xargs to run wget in parallel (10 parallel processes)
-                cmd = f"cat {temp_file_path} | xargs -P 10 -I {{}} wget --directory-prefix={str(downloads_path)} --continue --no-clobber --progress=bar --tries=3 --no-check-certificate {{}}"
+                cmd = f"cat {temp_file_path} | xargs -P 10 -I {{}} wget --directory-prefix={str(downloads_path)} --continue --no-clobber --progress=bar --tries=10 --no-check-certificate {{}}"
                 subprocess.run(cmd, shell=True, check=True)
 
                 # Remove the temporary file after use

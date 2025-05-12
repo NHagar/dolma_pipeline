@@ -55,7 +55,7 @@ redpajama_v2 = DatasetConfig(
 
 
 DATASETS = [
-    dolma,
+    # dolma,
     redpajama_1t,
     redpajama_v2,
 ]
