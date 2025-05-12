@@ -108,13 +108,15 @@ for dataset in DATASETS:
             files = list(Path(downloads_path).glob("*.json.gz"))
             # process files in parallel
             with Pool(processes=8) as pool:
-                tqdm(
-                    pool.map(
-                        process_url_file,
-                        [(file, variant.selection_sql) for file in files],
-                    ),
-                    total=len(files),
-                    desc="Processing files",
+                list(
+                    tqdm(
+                        pool.imap(
+                            process_url_file,
+                            [(file, variant.selection_sql) for file in files],
+                        ),
+                        total=len(files),
+                        desc="Processing files",
+                    )
                 )
 
             parquet_file = intermediate_path / f"{pattern_local}.parquet"
