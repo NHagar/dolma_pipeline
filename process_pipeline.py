@@ -1,6 +1,7 @@
 import os
 import subprocess
 import tempfile
+from multiprocessing import Pool
 from pathlib import Path
 
 import duckdb
@@ -32,6 +33,27 @@ def batch_urls(url_list, batch_size=100):
     """Split the URL list into batches of specified size."""
     for i in range(0, len(url_list), batch_size):
         yield url_list[i : i + batch_size]
+
+
+def process_url_file(args):
+    fpath, selector = args
+    command = f"zcat {fpath} | jq -r '.{selector}'"
+    result = subprocess.run(command, shell=True, capture_output=True, text=True)
+    if result.returncode != 0:
+        print(f"Failed to process file {fpath}: {result.stderr}")
+        raise Exception(f"Failed to process file {fpath}: {result.stderr}")
+    extracted_urls = result.stdout.splitlines()
+    domains = [extract_domain(url) for url in extracted_urls]
+
+    df = pd.DataFrame({"url": extracted_urls, "domain": domains})
+    df = df.dropna()
+    df.to_parquet(
+        fpath.with_suffix(".parquet"),
+        index=False,
+        compression="zstd",
+        engine="pyarrow",
+    )
+    return True
 
 
 for dataset in DATASETS:
@@ -81,52 +103,30 @@ for dataset in DATASETS:
                     os.unlink(temp_file_path)
                 raise
 
-            db_file = intermediate_path / f"{pattern_local}.duckdb"
-            con = duckdb.connect(database=db_file, read_only=False)
-            con.execute(
-                "CREATE TABLE IF NOT EXISTS urls (url VARCHAR, domain VARCHAR);"
-            )
+            con = duckdb.connect()
 
             files = list(Path(downloads_path).glob("*.json.gz"))
-            for file in tqdm(files):
-                command = f"zcat {file} | jq -r '.{variant.selection_sql}'"
-                result = subprocess.run(
-                    command, shell=True, capture_output=True, text=True
+            # process files in parallel
+            with Pool(processes=8) as pool:
+                tqdm(
+                    pool.map(
+                        process_url_file,
+                        [(file, variant.selection_sql) for file in files],
+                    ),
+                    total=len(files),
+                    desc="Processing files",
                 )
-                if result.returncode != 0:
-                    print(f"Failed to process file {file}: {result.stderr}")
-                    raise Exception(f"Failed to process file {file}: {result.stderr}")
-                extracted_urls = result.stdout.splitlines()
-                domains = [extract_domain(url) for url in extracted_urls]
 
-                df = pd.DataFrame({"url": extracted_urls, "domain": domains})
-                df = df.dropna()
-                print(df.head())
-
-                con.execute("INSERT INTO urls SELECT * FROM df")
+            parquet_file = intermediate_path / f"{pattern_local}.parquet"
+            con.execute(
+                f"COPY (SELECT * FROM read_parquet('{str(downloads_path)}/*.parquet')) TO '{str(parquet_file)}';"
+            )
 
             # add URL to completed list
             with open(f"completed/{pattern_local}", "a") as f:
                 for url in url_batch:
                     f.write(f"{url}\n")
             print(f"Added {len(url_batch)} URLs to completed list.")
-
-            # Remove the downloaded files
-            for url in url_batch:
-                url = url.split("/")[-1]
-                file_path = downloads_path / url
-                if file_path.exists():
-                    file_path.unlink(missing_ok=True)
-                else:
-                    print(f"File {file_path} does not exist.")
-            print(f"Removed downloaded files for {pattern_local}.")
-
-            # Write to Parquet
-            parquet_file = intermediate_path / f"{pattern_local}.parquet"
-            con.execute(
-                f"COPY (SELECT * FROM urls) TO '{str(parquet_file)}' (FORMAT PARQUET, CODEC 'ZSTD');"
-            )
-            print(f"Created {parquet_file}.")
 
             # Upload to Hugging Face
             api = HfApi()
@@ -151,9 +151,16 @@ for dataset in DATASETS:
                 commit_message=f"Add batch {batch_num_str} of {pattern_local}",
                 revision="main",
             )
+
+            # Remove everything in the downloads folder
+            for file in downloads_path.glob("*.json.gz"):
+                file.unlink(missing_ok=True)
+            # Remove the parquet files
+            for file in downloads_path.glob("*.parquet"):
+                file.unlink(missing_ok=True)
             # Remove the intermediate files
-            con.execute("DROP TABLE urls;")
+            for file in intermediate_path.glob("*.parquet"):
+                file.unlink(missing_ok=True)
+
             con.close()
-            Path(db_file).unlink(missing_ok=True)
-            Path(parquet_file).unlink(missing_ok=True)
             print(f"Removed intermediate files for {pattern_local}.")
