@@ -105,7 +105,7 @@ for dataset in DATASETS:
 
             con = duckdb.connect()
 
-            files = list(Path(downloads_path).glob("*.json.gz"))
+            files = list(Path(downloads_path).glob("*.jsonl"))
             # process files in parallel
             with Pool(processes=8) as pool:
                 list(
