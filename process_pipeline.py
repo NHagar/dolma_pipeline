@@ -11,6 +11,7 @@ from huggingface_hub import HfApi
 from tqdm import tqdm
 
 from datasets import DATASETS
+import hashlib
 
 intermediate_path = Path("/scratch/nrh146/intermediate")
 intermediate_path.mkdir(parents=True, exist_ok=True)
@@ -131,8 +132,9 @@ for dataset in DATASETS:
             api = HfApi()
             repo_id_to_upload = pattern_hf
             # unique batch number for repo
-            batch_num_str = url.split("/")[-1].split(".")[0]
-            path_in_repo = f"batch_{batch_num_str}.parquet"
+            batch_hash = hashlib.md5("_".join(url_batch).encode()).hexdigest()[:8]
+            batch_num_str = f"batch_{batch_hash}"
+            path_in_repo = f"{batch_num_str}.parquet"
             api.create_repo(
                 repo_id=repo_id_to_upload,
                 exist_ok=True,
