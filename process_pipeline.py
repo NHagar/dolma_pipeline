@@ -37,7 +37,10 @@ def batch_urls(url_list, batch_size=100):
 
 def process_url_file(args):
     fpath, selector = args
-    command = f"zcat {fpath} | jq -r '.{selector}'"
+    if fpath.suffix == ".gz":
+        command = f"zcat {fpath} | jq -r '.{selector}'"
+    else:
+        command = f"cat {fpath} | jq -r '.{selector}'"
     result = subprocess.run(command, shell=True, capture_output=True, text=True)
     if result.returncode != 0:
         print(f"Failed to process file {fpath}: {result.stderr}")

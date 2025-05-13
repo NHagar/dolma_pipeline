@@ -11,4 +11,6 @@
 
 module purge all
 
+module load jq
+
 uv run process_pipeline.py 
