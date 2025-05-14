@@ -21,9 +21,9 @@ parser = argparse.ArgumentParser(
 parser.add_argument("dataset_name", type=str, help="The name of the dataset to process")
 args = parser.parse_args()
 
-intermediate_path = Path("/scratch/nrh146/intermediate")
+intermediate_path = Path(f"/scratch/nrh146/intermediate/{args.dataset_name}")
 intermediate_path.mkdir(parents=True, exist_ok=True)
-downloads_path = Path("/scratch/nrh146/downloads")
+downloads_path = Path(f"/scratch/nrh146/downloads/{args.dataset_name}")
 downloads_path.mkdir(parents=True, exist_ok=True)
 
 
