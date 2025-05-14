@@ -53,9 +53,23 @@ redpajama_v2 = DatasetConfig(
     ],
 )
 
+hpltv1_2 = DatasetConfig(
+    name="hplt-v1.2",
+    variants=[
+        VariantConfig(
+            name="default",
+            url_list_url="https://data.hplt-project.org/one/monotext/cleaned/hplt_monolingual_map_cleaned_1.2.txt",
+            selection_sql="url",
+            inclusion_filters=[".jsonl.zst"],
+            exclusion_filters=None,
+        )
+    ],
+)
+
 
 DATASETS = [
-    # dolma,
+    dolma,
     redpajama_1t,
     redpajama_v2,
+    hpltv1_2,
 ]
