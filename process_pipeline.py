@@ -121,7 +121,10 @@ for variant in dataset.variants:
                 temp_file_path = temp_file.name
 
             # Use xargs to run wget in parallel (10 parallel processes)
-            cmd = f"cat {temp_file_path} | xargs -P 8 -I {{}} wget --directory-prefix={str(downloads_path)} --continue --no-clobber --progress=bar --tries=10 --no-check-certificate {{}}"
+            if args.dataset_name == "redpajama-data-v2":
+                cmd = f"cat {temp_file_path} | xargs -P 8 -I {{}} wget --directory-prefix={str(downloads_path)} --continue --no-clobber --progress=bar --tries=10 --cut-dirs=3 --no-check-certificate -nH {{}}"
+            else:
+                cmd = f"cat {temp_file_path} | xargs -P 8 -I {{}} wget --directory-prefix={str(downloads_path)} --continue --no-clobber --progress=bar --tries=10 --no-check-certificate {{}}"
             subprocess.run(cmd, shell=True, check=True)
 
             # Remove the temporary file after use
@@ -134,7 +137,7 @@ for variant in dataset.variants:
 
         con = duckdb.connect()
 
-        files = list(Path(downloads_path).glob(f"*.{dataset.fpath_suffix}"))
+        files = list(Path(downloads_path).glob(f"**/*.{dataset.fpath_suffix}"))
         # process files in parallel
         with Pool(processes=8) as pool:
             list(
@@ -150,7 +153,7 @@ for variant in dataset.variants:
 
         parquet_file = intermediate_path / f"{pattern_local}.parquet"
         con.execute(
-            f"COPY (SELECT * FROM read_parquet('{str(downloads_path)}/*.parquet')) TO '{str(parquet_file)}';"
+            f"COPY (SELECT * FROM read_parquet('{str(downloads_path)}/**/*.parquet')) TO '{str(parquet_file)}';"
         )
 
         # Upload to Hugging Face
@@ -185,10 +188,10 @@ for variant in dataset.variants:
         print(f"Added {len(url_batch)} URLs to completed list.")
 
         # Remove everything in the downloads folder
-        for file in downloads_path.glob("*.json.gz"):
+        for file in downloads_path.glob("**/*.json.gz"):
             file.unlink(missing_ok=True)
         # Remove the parquet files
-        for file in downloads_path.glob("*.parquet"):
+        for file in downloads_path.glob("**/*.parquet"):
             file.unlink(missing_ok=True)
         # Remove the intermediate files
         for file in intermediate_path.glob("*.parquet"):
