@@ -13,4 +13,4 @@ module purge all
 
 module load jq
 
-uv run process_pipeline.py 
+uv run process_pipeline.py hplt-v1.2
