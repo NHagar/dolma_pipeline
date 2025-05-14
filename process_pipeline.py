@@ -134,7 +134,7 @@ for variant in dataset.variants:
 
         con = duckdb.connect()
 
-        files = list(Path(downloads_path).glob("*.jsonl"))
+        files = list(Path(downloads_path).glob(f"*.{dataset.fpath_suffix}"))
         # process files in parallel
         with Pool(processes=8) as pool:
             list(

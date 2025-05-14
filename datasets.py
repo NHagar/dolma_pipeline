@@ -25,6 +25,7 @@ dolma = DatasetConfig(
             exclusion_filters=None,
         ),
     ],
+    fpath_suffix=".json.gz",
 )
 
 redpajama_1t = DatasetConfig(
@@ -38,6 +39,7 @@ redpajama_1t = DatasetConfig(
             exclusion_filters=None,
         )
     ],
+    fpath_suffix=".jsonl"
 )
 
 redpajama_v2 = DatasetConfig(
@@ -51,6 +53,7 @@ redpajama_v2 = DatasetConfig(
             exclusion_filters=None,
         )
     ],
+    fpath_suffix=".json.gz"
 )
 
 hpltv1_2 = DatasetConfig(
@@ -64,6 +67,7 @@ hpltv1_2 = DatasetConfig(
             exclusion_filters=None,
         )
     ],
+    fpath_suffix=".jsonl.zst",
 )
 
 
