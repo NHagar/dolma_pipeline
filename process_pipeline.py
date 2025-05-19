@@ -105,9 +105,14 @@ for variant in dataset.variants:
         print(f"No new URLs to process for {pattern_local}.")
         continue
 
-    # Process URLs in batches of 100
+    # Process URLs in batches
+    if args.dataset_name == "redpajama-data-v2":
+        batch_size = 10_000
+    else:
+        batch_size = 100
+
     for url_batch in tqdm(
-        list(batch_urls(url_list, 100)),
+        list(batch_urls(url_list, batch_size)),
         desc=f"Processing batches for {pattern_local}",
     ):
         print(f"Batch urls: {url_batch}")
