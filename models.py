@@ -14,3 +14,4 @@ class VariantConfig(BaseModel):
 class DatasetConfig(BaseModel):
     name: str
     variants: List[VariantConfig]
+    fpath_suffix: str
