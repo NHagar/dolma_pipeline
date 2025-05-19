@@ -1,9 +1,11 @@
+import argparse
+import hashlib
 import os
 import subprocess
 import tempfile
-import argparse
 from multiprocessing import Pool
 from pathlib import Path
+from typing import Union
 
 import duckdb
 import pandas as pd
@@ -12,7 +14,6 @@ from huggingface_hub import HfApi
 from tqdm import tqdm
 
 from datasets import DATASETS
-import hashlib
 
 # Parse command line arguments
 parser = argparse.ArgumentParser(
@@ -27,7 +28,7 @@ downloads_path = Path(f"/scratch/nrh146/downloads/{args.dataset_name}")
 downloads_path.mkdir(parents=True, exist_ok=True)
 
 
-def extract_domain(url: str) -> str:
+def extract_domain(url: str) -> Union[str, None]:
     if url is None:
         return None
     try:
@@ -46,9 +47,7 @@ def batch_urls(url_list, batch_size=100):
 
 def process_url_file(args):
     fpath, selector = args
-    if fpath.suffix == ".gz":
-        command = f"zcat {fpath} | jq -r '.{selector}'"
-    elif fpath.suffix == ".zst":
+    if fpath.suffix in [".gz", ".zst"]:
         command = f"zstdcat {fpath} | jq -r '.{selector}'"
     else:
         command = f"cat {fpath} | jq -r '.{selector}'"
@@ -113,6 +112,7 @@ for variant in dataset.variants:
     ):
         print(f"Batch urls: {url_batch}")
         # Download the files in batch using xargs for parallel processing
+        temp_file_path = None
         try:
             # Create a temporary file for the batch of URLs
             with tempfile.NamedTemporaryFile(mode="w", delete=False) as temp_file:
@@ -131,7 +131,7 @@ for variant in dataset.variants:
             os.unlink(temp_file_path)
         except subprocess.CalledProcessError as e:
             print(f"Failed to download batch: {e}")
-            if os.path.exists(temp_file_path):
+            if temp_file_path and os.path.exists(temp_file_path):
                 os.unlink(temp_file_path)
             raise
 
@@ -168,9 +168,7 @@ for variant in dataset.variants:
             exist_ok=True,
             repo_type="dataset",
         )
-        print(
-            f"Uploading {parquet_file} to {repo_id_to_upload} as {path_in_repo}..."
-        )
+        print(f"Uploading {parquet_file} to {repo_id_to_upload} as {path_in_repo}...")
 
         api.upload_file(
             path_or_fileobj=parquet_file,
