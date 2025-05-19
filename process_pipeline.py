@@ -122,9 +122,9 @@ for variant in dataset.variants:
 
             # Use xargs to run wget in parallel (10 parallel processes)
             if args.dataset_name == "redpajama-data-v2":
-                cmd = f"cat {temp_file_path} | xargs -P 8 -I {{}} wget --directory-prefix={str(downloads_path)} --continue --no-clobber --progress=bar --tries=10 --cut-dirs=3 --no-check-certificate -nH {{}}"
+                cmd = f"cat {temp_file_path} | xargs -P 8 -I {{}} wget -q --directory-prefix={str(downloads_path)} --continue --no-clobber --tries=10 --cut-dirs=3 --no-check-certificate -nH {{}}"
             else:
-                cmd = f"cat {temp_file_path} | xargs -P 8 -I {{}} wget --directory-prefix={str(downloads_path)} --continue --no-clobber --progress=bar --tries=10 --no-check-certificate {{}}"
+                cmd = f"cat {temp_file_path} | xargs -P 8 -I {{}} wget -q --directory-prefix={str(downloads_path)} --continue --no-clobber --tries=10 --no-check-certificate {{}}"
             subprocess.run(cmd, shell=True, check=True)
 
             # Remove the temporary file after use
