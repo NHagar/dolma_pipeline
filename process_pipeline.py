@@ -112,7 +112,7 @@ for variant in dataset.variants:
         batch_size = 100
 
     for url_batch in tqdm(
-        list(batch_urls(url_list, batch_size)),
+        list(batch_urls(url_list, batch_size=batch_size)),
         desc=f"Processing batches for {pattern_local}",
     ):
         print(f"Batch urls: {url_batch}")
