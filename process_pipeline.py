@@ -1,5 +1,6 @@
 import argparse
 import hashlib
+import logging
 import os
 import subprocess
 import tempfile
@@ -14,6 +15,12 @@ from huggingface_hub import HfApi
 from tqdm import tqdm
 
 from datasets import DATASETS
+
+# Set up logging
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+)
+logger = logging.getLogger(__name__)
 
 
 def extract_domain(url: str) -> Union[str, None]:
@@ -94,18 +101,27 @@ def main():
         if variant.name != "default":
             pattern_hf += f"_{variant.name}"
 
+        logger.info(f"Loading URL list from urls/{pattern_local}")
         with open(f"urls/{pattern_local}", "r") as f:
             url_list = f.readlines()
         url_list = [url.strip() for url in url_list]
+        logger.info(f"Loaded {len(url_list):,} URLs")
 
+        logger.info(f"Loading completed URLs from completed/{pattern_local}")
         with open(f"completed/{pattern_local}", "r") as f:
             completed = f.readlines()
-        completed = [url.strip() for url in completed]
+        completed_set = {url.strip() for url in completed}
+        logger.info(f"Loaded {len(completed_set):,} completed URLs")
 
-        # Filter out URLs that are already completed
-        url_list = [url for url in url_list if url not in completed]
+        # Filter out URLs that are already completed using set for O(1) lookup
+        logger.info("Filtering out already completed URLs...")
+        url_list = [url for url in url_list if url not in completed_set]
+        logger.info(
+            f"Found {len(url_list):,} new URLs to process (filtered out {len(completed_set):,} completed URLs)"
+        )
+
         if not url_list:
-            print(f"No new URLs to process for {pattern_local}.")
+            logger.info(f"No new URLs to process for {pattern_local}.")
             continue
 
         # Process URLs in batches
