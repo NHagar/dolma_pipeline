@@ -137,6 +137,7 @@ def main():
             # Download the files in batch using xargs for parallel processing
             temp_file_path = None
             try:
+                logger.info("Writing URLs to temporary file for batch download...")
                 # Create a temporary file for the batch of URLs
                 with tempfile.NamedTemporaryFile(mode="w", delete=False) as temp_file:
                     for url in url_batch:
@@ -148,6 +149,7 @@ def main():
                     cmd = f"cat {temp_file_path} | xargs -P 8 -I {{}} wget -q --directory-prefix={str(downloads_path)} --continue --no-clobber --tries=10 --cut-dirs 1 --force-directories --no-check-certificate -nH {{}}"
                 else:
                     cmd = f"cat {temp_file_path} | xargs -P 8 -I {{}} wget -q --directory-prefix={str(downloads_path)} --continue --no-clobber --tries=10 --no-check-certificate {{}}"
+                logger.info(f"Running command: {cmd}")
                 subprocess.run(cmd, shell=True, check=True)
 
                 # Remove the temporary file after use
@@ -163,6 +165,7 @@ def main():
             files = list(Path(downloads_path).glob(f"**/*{dataset.fpath_suffix}"))
             # process files in parallel
             with Pool(processes=8) as pool:
+                logger.info(f"Processing {len(files)} files in parallel...")
                 list(
                     tqdm(
                         pool.imap(
@@ -180,8 +183,9 @@ def main():
             con.execute(
                 f"COPY (SELECT * FROM read_parquet('{str(downloads_path)}/**/*.parquet')) TO '{str(parquet_file)}';"
             )
-
+            logger.info(f"Combined parquet file created at {parquet_file}")
             # Upload to Hugging Face
+            logger.info(f"Uploading {parquet_file} to Hugging Face...")
             api = HfApi()
             repo_id_to_upload = pattern_hf
             # unique batch number for repo
