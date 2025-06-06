@@ -1,12 +1,13 @@
 import argparse
 import hashlib
+import json
 import logging
 import os
 import subprocess
 import tempfile
 from multiprocessing import Pool
 from pathlib import Path
-from typing import Union
+from typing import Dict, Union
 
 import duckdb
 import pandas as pd
@@ -40,6 +41,108 @@ def batch_urls(url_list, batch_size=100):
         yield url_list[i : i + batch_size]
 
 
+def create_url_mapping(url_batch: list, downloads_path: Path, dataset_name: str) -> Dict[str, str]:
+    """Create a mapping from downloaded file paths to their source URLs."""
+    url_mapping = {}
+    
+    for url in url_batch:
+        if dataset_name == "redpajama-data-v2":
+            # For redpajama-data-v2, files are organized with --cut-dirs 1 --force-directories
+            url_parts = url.split('/')
+            # Remove the first directory level and reconstruct the path
+            relative_path = '/'.join(url_parts[4:])  # Skip protocol, domain, and first directory
+            local_path = downloads_path / relative_path
+        else:
+            # For other datasets, files are downloaded directly to downloads_path
+            filename = url.split('/')[-1]
+            local_path = downloads_path / filename
+        
+        url_mapping[str(local_path)] = url
+    
+    return url_mapping
+
+
+def save_url_mapping(url_mapping: Dict[str, str], mapping_file: Path):
+    """Save URL mapping to a JSON file."""
+    with open(mapping_file, 'w') as f:
+        json.dump(url_mapping, f, indent=2)
+
+
+def load_url_mapping(mapping_file: Path) -> Dict[str, str]:
+    """Load URL mapping from a JSON file."""
+    if mapping_file.exists():
+        with open(mapping_file, 'r') as f:
+            return json.load(f)
+    return {}
+
+
+def redownload_corrupted_file(file_path: str, url: str, downloads_path: Path, dataset_name: str) -> bool:
+    """Re-download a corrupted file from its source URL."""
+    try:
+        logger.info(f"Re-downloading corrupted file: {file_path}")
+        
+        # Remove the corrupted file
+        if os.path.exists(file_path):
+            os.unlink(file_path)
+            logger.info(f"Removed corrupted file: {file_path}")
+        
+        # Re-download the file
+        if dataset_name == "redpajama-data-v2":
+            cmd = f"wget -q --directory-prefix={str(downloads_path)} --continue --no-clobber --tries=10 --cut-dirs 1 --force-directories --no-check-certificate -nH {url}"
+        else:
+            cmd = f"wget -q --directory-prefix={str(downloads_path)} --continue --no-clobber --tries=10 --no-check-certificate {url}"
+        
+        result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+        
+        if result.returncode == 0:
+            logger.info(f"Successfully re-downloaded: {file_path}")
+            return True
+        else:
+            logger.error(f"Failed to re-download {file_path}: {result.stderr}")
+            return False
+            
+    except Exception as e:
+        logger.error(f"Error re-downloading {file_path}: {str(e)}")
+        return False
+
+
+def process_url_file_with_retry(args):
+    """Process a file with retry logic for corrupted files."""
+    fpath, selector, url_mapping, downloads_path, dataset_name = args
+    
+    max_retries = 2
+    for attempt in range(max_retries + 1):
+        try:
+            return process_url_file((fpath, selector))
+        except Exception as e:
+            error_msg = str(e)
+            
+            # Check if this is a corruption-related error
+            is_corruption_error = any(phrase in error_msg.lower() for phrase in [
+                "parse error", "invalid", "unexpected", "corrupt", "malformed"
+            ])
+            
+            if is_corruption_error and attempt < max_retries:
+                logger.warning(f"Detected corrupted file {fpath} (attempt {attempt + 1}/{max_retries + 1}): {error_msg}")
+                
+                # Try to re-download the file
+                file_path_str = str(fpath)
+                if file_path_str in url_mapping:
+                    url = url_mapping[file_path_str]
+                    if redownload_corrupted_file(file_path_str, url, downloads_path, dataset_name):
+                        logger.info(f"Re-download successful, retrying processing of {fpath}")
+                        continue
+                    else:
+                        logger.error(f"Re-download failed for {fpath}")
+                else:
+                    logger.error(f"No URL mapping found for corrupted file: {fpath}")
+            
+            # If it's the last attempt or not a corruption error, re-raise
+            if attempt == max_retries:
+                logger.error(f"Failed to process file {fpath} after {max_retries + 1} attempts: {error_msg}")
+                raise e
+
+
 def process_url_file(args):
     fpath, selector = args
     if fpath.suffix in [".gz", ".zst"]:
@@ -48,7 +151,6 @@ def process_url_file(args):
         command = f"cat {fpath} | jq -r '.{selector}'"
     result = subprocess.run(command, shell=True, capture_output=True, text=True)
     if result.returncode != 0:
-        print(f"Failed to process file {fpath}: {result.stderr}")
         raise Exception(f"Failed to process file {fpath}: {result.stderr}")
     extracted_urls = result.stdout.splitlines()
     domains = [extract_domain(url) for url in extracted_urls]
@@ -144,6 +246,13 @@ def main():
                         temp_file.write(f"{url}\n")
                     temp_file_path = temp_file.name
 
+                # Create URL mapping before downloading
+                url_mapping = create_url_mapping(url_batch, downloads_path, args.dataset_name)
+                batch_hash_temp = hashlib.md5("_".join(url_batch).encode()).hexdigest()[:8]
+                mapping_file = downloads_path / f"url_mapping_{batch_hash_temp}.json"
+                save_url_mapping(url_mapping, mapping_file)
+                logger.info(f"Created URL mapping with {len(url_mapping)} entries")
+
                 # Use xargs to run wget in parallel (10 parallel processes)
                 if args.dataset_name == "redpajama-data-v2":
                     cmd = f"cat {temp_file_path} | xargs -P 8 -I {{}} wget -q --directory-prefix={str(downloads_path)} --continue --no-clobber --tries=10 --cut-dirs 1 --force-directories --no-check-certificate -nH {{}}"
@@ -163,14 +272,14 @@ def main():
             con = duckdb.connect()
 
             files = list(Path(downloads_path).glob(f"**/*{dataset.fpath_suffix}"))
-            # process files in parallel
+            # process files in parallel with retry logic
             with Pool(processes=8) as pool:
-                logger.info(f"Processing {len(files)} files in parallel...")
+                logger.info(f"Processing {len(files)} files in parallel with corruption retry...")
                 list(
                     tqdm(
                         pool.imap(
-                            process_url_file,
-                            [(file, variant.selection_sql) for file in files],
+                            process_url_file_with_retry,
+                            [(file, variant.selection_sql, url_mapping, downloads_path, args.dataset_name) for file in files],
                         ),
                         total=len(files),
                         desc="Processing files",
@@ -221,6 +330,9 @@ def main():
                 file.unlink(missing_ok=True)
             # Remove the parquet files
             for file in downloads_path.glob("**/*.parquet"):
+                file.unlink(missing_ok=True)
+            # Remove URL mapping files
+            for file in downloads_path.glob("url_mapping_*.json"):
                 file.unlink(missing_ok=True)
             # Remove the intermediate files
             for file in intermediate_path.glob("*.parquet"):
