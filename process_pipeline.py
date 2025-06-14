@@ -119,7 +119,7 @@ def process_url_file_with_retry(args):
             
             # Check if this is a corruption-related error
             is_corruption_error = any(phrase in error_msg.lower() for phrase in [
-                "parse error", "invalid", "unexpected", "corrupt", "malformed"
+                "parse error", "invalid", "unexpected", "corrupt", "malformed", "numeric literal"
             ])
             
             if is_corruption_error and attempt < max_retries:
