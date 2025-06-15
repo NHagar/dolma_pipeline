@@ -76,6 +76,26 @@ def load_url_mapping(mapping_file: Path) -> Dict[str, str]:
     return {}
 
 
+def is_xml_file(file_path: Path) -> bool:
+    """Check if a file contains XML content by examining the first few bytes."""
+    try:
+        if file_path.suffix in [".gz", ".zst"]:
+            # For compressed files, use zstdcat to read the first few bytes
+            command = f"zstdcat {file_path} | head -c 100"
+        else:
+            # For uncompressed files, read directly
+            command = f"head -c 100 {file_path}"
+        
+        result = subprocess.run(command, shell=True, capture_output=True, text=True)
+        if result.returncode == 0:
+            content = result.stdout.strip()
+            # Check for XML markers
+            return content.startswith('<?xml') or '<SelectObjectContentRequest' in content
+    except Exception:
+        pass
+    return False
+
+
 def redownload_corrupted_file(file_path: str, url: str, downloads_path: Path, dataset_name: str) -> bool:
     """Re-download a corrupted file from its source URL."""
     try:
@@ -272,16 +292,30 @@ def main():
             con = duckdb.connect()
 
             files = list(Path(downloads_path).glob(f"**/*{dataset.fpath_suffix}"))
-            # process files in parallel with retry logic
+            
+            # Filter out XML metadata files
+            logger.info(f"Found {len(files)} files, filtering out XML metadata files...")
+            json_files = []
+            xml_files = []
+            for file in files:
+                if is_xml_file(file):
+                    xml_files.append(file)
+                else:
+                    json_files.append(file)
+            
+            if xml_files:
+                logger.info(f"Skipping {len(xml_files)} XML metadata files")
+            
+            # process JSON files in parallel with retry logic
             with Pool(processes=8) as pool:
-                logger.info(f"Processing {len(files)} files in parallel with corruption retry...")
+                logger.info(f"Processing {len(json_files)} JSON files in parallel with corruption retry...")
                 list(
                     tqdm(
                         pool.imap(
                             process_url_file_with_retry,
-                            [(file, variant.selection_sql, url_mapping, downloads_path, args.dataset_name) for file in files],
+                            [(file, variant.selection_sql, url_mapping, downloads_path, args.dataset_name) for file in json_files],
                         ),
-                        total=len(files),
+                        total=len(json_files),
                         desc="Processing files",
                     )
                 )
