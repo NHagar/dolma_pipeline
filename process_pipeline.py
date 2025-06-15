@@ -5,6 +5,7 @@ import logging
 import os
 import subprocess
 import tempfile
+import time
 from multiprocessing import Pool
 from pathlib import Path
 from typing import Dict, Union
@@ -41,37 +42,41 @@ def batch_urls(url_list, batch_size=100):
         yield url_list[i : i + batch_size]
 
 
-def create_url_mapping(url_batch: list, downloads_path: Path, dataset_name: str) -> Dict[str, str]:
+def create_url_mapping(
+    url_batch: list, downloads_path: Path, dataset_name: str
+) -> Dict[str, str]:
     """Create a mapping from downloaded file paths to their source URLs."""
     url_mapping = {}
-    
+
     for url in url_batch:
         if dataset_name == "redpajama-data-v2":
             # For redpajama-data-v2, files are organized with --cut-dirs 1 --force-directories
-            url_parts = url.split('/')
+            url_parts = url.split("/")
             # Remove the first directory level and reconstruct the path
-            relative_path = '/'.join(url_parts[4:])  # Skip protocol, domain, and first directory
+            relative_path = "/".join(
+                url_parts[4:]
+            )  # Skip protocol, domain, and first directory
             local_path = downloads_path / relative_path
         else:
             # For other datasets, files are downloaded directly to downloads_path
-            filename = url.split('/')[-1]
+            filename = url.split("/")[-1]
             local_path = downloads_path / filename
-        
+
         url_mapping[str(local_path)] = url
-    
+
     return url_mapping
 
 
 def save_url_mapping(url_mapping: Dict[str, str], mapping_file: Path):
     """Save URL mapping to a JSON file."""
-    with open(mapping_file, 'w') as f:
+    with open(mapping_file, "w") as f:
         json.dump(url_mapping, f, indent=2)
 
 
 def load_url_mapping(mapping_file: Path) -> Dict[str, str]:
     """Load URL mapping from a JSON file."""
     if mapping_file.exists():
-        with open(mapping_file, 'r') as f:
+        with open(mapping_file, "r") as f:
             return json.load(f)
     return {}
 
@@ -85,42 +90,46 @@ def is_xml_file(file_path: Path) -> bool:
         else:
             # For uncompressed files, read directly
             command = f"head -c 100 {file_path}"
-        
+
         result = subprocess.run(command, shell=True, capture_output=True, text=True)
         if result.returncode == 0:
             content = result.stdout.strip()
             # Check for XML markers
-            return content.startswith('<?xml') or '<SelectObjectContentRequest' in content
+            return (
+                content.startswith("<?xml") or "<SelectObjectContentRequest" in content
+            )
     except Exception:
         pass
     return False
 
 
-def redownload_corrupted_file(file_path: str, url: str, downloads_path: Path, dataset_name: str) -> bool:
+def redownload_corrupted_file(
+    file_path: str, url: str, downloads_path: Path, dataset_name: str
+) -> bool:
     """Re-download a corrupted file from its source URL."""
     try:
         logger.info(f"Re-downloading corrupted file: {file_path}")
-        
+
         # Remove the corrupted file
         if os.path.exists(file_path):
             os.unlink(file_path)
             logger.info(f"Removed corrupted file: {file_path}")
-        
+
         # Re-download the file
         if dataset_name == "redpajama-data-v2":
             cmd = f"wget -q --directory-prefix={str(downloads_path)} --continue --no-clobber --tries=10 --cut-dirs 1 --force-directories --no-check-certificate -nH {url}"
         else:
             cmd = f"wget -q --directory-prefix={str(downloads_path)} --continue --no-clobber --tries=10 --no-check-certificate {url}"
-        
+
         result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
-        
+
         if result.returncode == 0:
             logger.info(f"Successfully re-downloaded: {file_path}")
             return True
         else:
             logger.error(f"Failed to re-download {file_path}: {result.stderr}")
             return False
-            
+
     except Exception as e:
         logger.error(f"Error re-downloading {file_path}: {str(e)}")
         return False
@@ -129,37 +138,53 @@ def redownload_corrupted_file(file_path: str, url: str, downloads_path: Path, da
 def process_url_file_with_retry(args):
     """Process a file with retry logic for corrupted files."""
     fpath, selector, url_mapping, downloads_path, dataset_name = args
-    
+
     max_retries = 2
     for attempt in range(max_retries + 1):
         try:
             return process_url_file((fpath, selector))
         except Exception as e:
             error_msg = str(e)
-            
+
             # Check if this is a corruption-related error
-            is_corruption_error = any(phrase in error_msg.lower() for phrase in [
-                "parse error", "invalid", "unexpected", "corrupt", "malformed", "numeric literal"
-            ])
-            
+            is_corruption_error = any(
+                phrase in error_msg.lower()
+                for phrase in [
+                    "parse error",
+                    "invalid",
+                    "unexpected",
+                    "corrupt",
+                    "malformed",
+                    "numeric literal",
+                ]
+            )
+
             if is_corruption_error and attempt < max_retries:
-                logger.warning(f"Detected corrupted file {fpath} (attempt {attempt + 1}/{max_retries + 1}): {error_msg}")
-                
+                logger.warning(
+                    f"Detected corrupted file {fpath} (attempt {attempt + 1}/{max_retries + 1}): {error_msg}"
+                )
+
                 # Try to re-download the file
                 file_path_str = str(fpath)
                 if file_path_str in url_mapping:
                     url = url_mapping[file_path_str]
-                    if redownload_corrupted_file(file_path_str, url, downloads_path, dataset_name):
-                        logger.info(f"Re-download successful, retrying processing of {fpath}")
+                    if redownload_corrupted_file(
+                        file_path_str, url, downloads_path, dataset_name
+                    ):
+                        logger.info(
+                            f"Re-download successful, retrying processing of {fpath}"
+                        )
                         continue
                     else:
                         logger.error(f"Re-download failed for {fpath}")
                 else:
                     logger.error(f"No URL mapping found for corrupted file: {fpath}")
-            
+
             # If it's the last attempt or not a corruption error, re-raise
             if attempt == max_retries:
-                logger.error(f"Failed to process file {fpath} after {max_retries + 1} attempts: {error_msg}")
+                logger.error(
+                    f"Failed to process file {fpath} after {max_retries + 1} attempts: {error_msg}"
+                )
                 raise e
 
 
@@ -267,19 +292,69 @@ def main():
                     temp_file_path = temp_file.name
 
                 # Create URL mapping before downloading
-                url_mapping = create_url_mapping(url_batch, downloads_path, args.dataset_name)
-                batch_hash_temp = hashlib.md5("_".join(url_batch).encode()).hexdigest()[:8]
+                url_mapping = create_url_mapping(
+                    url_batch, downloads_path, args.dataset_name
+                )
+                batch_hash_temp = hashlib.md5("_".join(url_batch).encode()).hexdigest()[
+                    :8
+                ]
                 mapping_file = downloads_path / f"url_mapping_{batch_hash_temp}.json"
                 save_url_mapping(url_mapping, mapping_file)
                 logger.info(f"Created URL mapping with {len(url_mapping)} entries")
 
-                # Use xargs to run wget in parallel (10 parallel processes)
+                # Use xargs to run wget in parallel with retry logic
+                max_download_retries = 3
+                download_success = False
+
                 if args.dataset_name == "redpajama-data-v2":
                     cmd = f"cat {temp_file_path} | xargs -P 8 -I {{}} wget -q --directory-prefix={str(downloads_path)} --continue --no-clobber --tries=10 --cut-dirs 1 --force-directories --no-check-certificate -nH {{}}"
                 else:
                     cmd = f"cat {temp_file_path} | xargs -P 8 -I {{}} wget -q --directory-prefix={str(downloads_path)} --continue --no-clobber --tries=10 --no-check-certificate {{}}"
-                logger.info(f"Running command: {cmd}")
-                subprocess.run(cmd, shell=True, check=True)
+
+                for retry_attempt in range(max_download_retries):
+                    try:
+                        logger.info(
+                            f"Running download command (attempt {retry_attempt + 1}/{max_download_retries}): {cmd}"
+                        )
+                        result = subprocess.run(
+                            cmd, shell=True, capture_output=True, text=True
+                        )
+
+                        if result.returncode == 0:
+                            download_success = True
+                            break
+                        elif result.returncode == 123:
+                            logger.warning(
+                                f"Some wget downloads failed (exit code 123) on attempt {retry_attempt + 1}/{max_download_retries}"
+                            )
+                            if retry_attempt < max_download_retries - 1:
+                                logger.info("Retrying batch download in 30 seconds...")
+                                time.sleep(30)
+                                continue
+                        else:
+                            logger.error(
+                                f"Download command failed with exit code {result.returncode}: {result.stderr}"
+                            )
+                            if retry_attempt < max_download_retries - 1:
+                                logger.info("Retrying batch download in 30 seconds...")
+                                time.sleep(30)
+                                continue
+                    except subprocess.CalledProcessError as e:
+                        logger.error(
+                            f"Download attempt {retry_attempt + 1} failed: {e}"
+                        )
+                        if retry_attempt < max_download_retries - 1:
+                            logger.info("Retrying batch download in 30 seconds...")
+                            time.sleep(30)
+                            continue
+
+                if not download_success:
+                    logger.error(
+                        f"Failed to download batch after {max_download_retries} attempts"
+                    )
+                    raise subprocess.CalledProcessError(
+                        1, cmd, "Download failed after all retries"
+                    )
 
                 # Remove the temporary file after use
                 os.unlink(temp_file_path)
@@ -292,9 +367,11 @@ def main():
             con = duckdb.connect()
 
             files = list(Path(downloads_path).glob(f"**/*{dataset.fpath_suffix}"))
-            
+
             # Filter out XML metadata files
-            logger.info(f"Found {len(files)} files, filtering out XML metadata files...")
+            logger.info(
+                f"Found {len(files)} files, filtering out XML metadata files..."
+            )
             json_files = []
             xml_files = []
             for file in files:
@@ -302,18 +379,29 @@ def main():
                     xml_files.append(file)
                 else:
                     json_files.append(file)
-            
+
             if xml_files:
                 logger.info(f"Skipping {len(xml_files)} XML metadata files")
-            
+
             # process JSON files in parallel with retry logic
             with Pool(processes=8) as pool:
-                logger.info(f"Processing {len(json_files)} JSON files in parallel with corruption retry...")
+                logger.info(
+                    f"Processing {len(json_files)} JSON files in parallel with corruption retry..."
+                )
                 list(
                     tqdm(
                         pool.imap(
                             process_url_file_with_retry,
-                            [(file, variant.selection_sql, url_mapping, downloads_path, args.dataset_name) for file in json_files],
+                            [
+                                (
+                                    file,
+                                    variant.selection_sql,
+                                    url_mapping,
+                                    downloads_path,
+                                    args.dataset_name,
+                                )
+                                for file in json_files
+                            ],
                         ),
                         total=len(json_files),
                         desc="Processing files",
