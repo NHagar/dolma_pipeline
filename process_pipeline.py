@@ -189,7 +189,9 @@ def process_url_file_with_retry(args):
 
 def process_url_file(args):
     fpath, selector = args
-    if fpath.suffix in [".gz", ".zst"]:
+    if fpath.suffix == ".gz":
+        command = f"gunzip -c {fpath} | jq -r '.{selector}'"
+    elif fpath.suffix == ".zst":
         command = f"zstdcat {fpath} | jq -r '.{selector}'"
     else:
         command = f"cat {fpath} | jq -r '.{selector}'"
