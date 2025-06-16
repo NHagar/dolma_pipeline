@@ -13,6 +13,7 @@ from typing import Dict, Union
 import duckdb
 import pandas as pd
 import tldextract
+from huggingface_hub import HfApi
 from tqdm import tqdm
 
 from datasets import DATASETS
@@ -279,7 +280,7 @@ def main():
             batch_size = 100
 
         for url_batch in tqdm(
-            [list(batch_urls(url_list, batch_size=batch_size))[0]],
+            list(batch_urls(url_list, batch_size=batch_size)),
             desc=f"Processing batches for {pattern_local}",
         ):
             # Download the files in batch using xargs for parallel processing
@@ -417,52 +418,52 @@ def main():
             )
             logger.info(f"Combined parquet file created at {parquet_file}")
             # # Upload to Hugging Face
-            # logger.info(f"Uploading {parquet_file} to Hugging Face...")
-            # api = HfApi()
-            # repo_id_to_upload = pattern_hf
-            # # unique batch number for repo
-            # batch_hash = hashlib.md5("_".join(url_batch).encode()).hexdigest()[:8]
-            # batch_num_str = f"batch_{batch_hash}"
-            # path_in_repo = f"{batch_num_str}.parquet"
-            # api.create_repo(
-            #     repo_id=repo_id_to_upload,
-            #     exist_ok=True,
-            #     repo_type="dataset",
-            # )
-            # print(
-            #     f"Uploading {parquet_file} to {repo_id_to_upload} as {path_in_repo}..."
-            # )
+            logger.info(f"Uploading {parquet_file} to Hugging Face...")
+            api = HfApi()
+            repo_id_to_upload = pattern_hf
+            # unique batch number for repo
+            batch_hash = hashlib.md5("_".join(url_batch).encode()).hexdigest()[:8]
+            batch_num_str = f"batch_{batch_hash}"
+            path_in_repo = f"{batch_num_str}.parquet"
+            api.create_repo(
+                repo_id=repo_id_to_upload,
+                exist_ok=True,
+                repo_type="dataset",
+            )
+            print(
+                f"Uploading {parquet_file} to {repo_id_to_upload} as {path_in_repo}..."
+            )
 
-            # api.upload_file(
-            #     path_or_fileobj=parquet_file,
-            #     path_in_repo=path_in_repo,
-            #     repo_id=repo_id_to_upload,
-            #     repo_type="dataset",
-            #     commit_message=f"Add batch {batch_num_str} of {pattern_local}",
-            #     revision="main",
-            # )
+            api.upload_file(
+                path_or_fileobj=parquet_file,
+                path_in_repo=path_in_repo,
+                repo_id=repo_id_to_upload,
+                repo_type="dataset",
+                commit_message=f"Add batch {batch_num_str} of {pattern_local}",
+                revision="main",
+            )
 
-            # # add URL to completed list
-            # with open(f"completed/{pattern_local}", "a") as f:
-            #     for url in url_batch:
-            #         f.write(f"{url}\n")
-            # print(f"Added {len(url_batch)} URLs to completed list.")
+            # add URL to completed list
+            with open(f"completed/{pattern_local}", "a") as f:
+                for url in url_batch:
+                    f.write(f"{url}\n")
+            print(f"Added {len(url_batch)} URLs to completed list.")
 
-            # # Remove everything in the downloads folder
-            # for file in downloads_path.glob("**/*.json.gz"):
-            #     file.unlink(missing_ok=True)
-            # # Remove the parquet files
-            # for file in downloads_path.glob("**/*.parquet"):
-            #     file.unlink(missing_ok=True)
-            # # Remove URL mapping files
-            # for file in downloads_path.glob("url_mapping_*.json"):
-            #     file.unlink(missing_ok=True)
-            # # Remove the intermediate files
-            # for file in intermediate_path.glob("*.parquet"):
-            #     file.unlink(missing_ok=True)
+            # Remove everything in the downloads folder
+            for file in downloads_path.glob("**/*.json.gz"):
+                file.unlink(missing_ok=True)
+            # Remove the parquet files
+            for file in downloads_path.glob("**/*.parquet"):
+                file.unlink(missing_ok=True)
+            # Remove URL mapping files
+            for file in downloads_path.glob("url_mapping_*.json"):
+                file.unlink(missing_ok=True)
+            # Remove the intermediate files
+            for file in intermediate_path.glob("*.parquet"):
+                file.unlink(missing_ok=True)
 
-            # con.close()
-            # print(f"Removed intermediate files for {pattern_local}.")
+            con.close()
+            print(f"Removed intermediate files for {pattern_local}.")
 
 
 if __name__ == "__main__":
