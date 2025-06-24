@@ -309,7 +309,7 @@ def main():
                 download_success = False
 
                 if args.dataset_name == "redpajama-data-v2":
-                    cmd = f"cat {temp_file_path} | xargs -P 8 -I {{}} wget -q --directory-prefix={str(downloads_path)} --continue --no-clobber --tries=10 --cut-dirs 1 --force-directories --no-check-certificate -nH {{}}"
+                    cmd = f"cat {temp_file_path} | xargs -P 2 -I {{}} wget -q --directory-prefix={str(downloads_path)} --continue --no-clobber --tries=10 --cut-dirs 1 --force-directories --no-check-certificate -nH {{}}"
                 else:
                     cmd = f"cat {temp_file_path} | xargs -P 8 -I {{}} wget -q --directory-prefix={str(downloads_path)} --continue --no-clobber --tries=10 --no-check-certificate {{}}"
 
@@ -330,24 +330,27 @@ def main():
                                 f"Some wget downloads failed (exit code 123) on attempt {retry_attempt + 1}/{max_download_retries}"
                             )
                             if retry_attempt < max_download_retries - 1:
-                                logger.info("Retrying batch download in 30 seconds...")
-                                time.sleep(30)
+                                sleep_time = 60 * (2 ** retry_attempt)
+                                logger.info(f"Retrying batch download in {sleep_time} seconds...")
+                                time.sleep(sleep_time)
                                 continue
                         else:
                             logger.error(
                                 f"Download command failed with exit code {result.returncode}: {result.stderr}"
                             )
                             if retry_attempt < max_download_retries - 1:
-                                logger.info("Retrying batch download in 30 seconds...")
-                                time.sleep(30)
+                                sleep_time = 60 * (2 ** retry_attempt)
+                                logger.info(f"Retrying batch download in {sleep_time} seconds...")
+                                time.sleep(sleep_time)
                                 continue
                     except subprocess.CalledProcessError as e:
                         logger.error(
                             f"Download attempt {retry_attempt + 1} failed: {e}"
                         )
                         if retry_attempt < max_download_retries - 1:
-                            logger.info("Retrying batch download in 30 seconds...")
-                            time.sleep(30)
+                            sleep_time = 60 * (2 ** retry_attempt)
+                            logger.info(f"Retrying batch download in {sleep_time} seconds...")
+                            time.sleep(sleep_time)
                             continue
 
                 if not download_success:
